@@ -1,0 +1,27 @@
+# Personal profile data — keep this off version control
+profiles/
+
+# Legacy personal config at repo root
+config.json
+skills.csv
+
+# Generated resumes and cover letters
+outputs/
+*.pdf
+
+# Job search tracking (personal data)
+applications.csv
+outreach_contacts.csv
+companies_to_check.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
