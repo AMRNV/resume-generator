@@ -21,6 +21,35 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # ---------------------------------------------------------------------------
+# competencies <-> plain-text helpers (used by the Experience/Projects dialogs)
+# ---------------------------------------------------------------------------
+
+def _competencies_to_text(comp_list):
+    lines = []
+    for group in comp_list or []:
+        lines.append("### " + group.get("category", ""))
+        for b in group.get("bullets", []):
+            lines.append("- " + b)
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _text_to_competencies(text):
+    groups = []
+    current = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("###"):
+            current = {"category": line[3:].strip(), "bullets": []}
+            groups.append(current)
+        elif line.startswith("-") and current is not None:
+            current["bullets"].append(line[1:].strip())
+    return groups
+
+
+# ---------------------------------------------------------------------------
 # Edit Profile window
 # ---------------------------------------------------------------------------
 
@@ -42,7 +71,8 @@ class EditProfileWindow(tk.Toplevel):
 
         self._build_contact_tab(nb)
         self._build_skills_tab(nb)
-        self._build_advanced_tab(nb)
+        self._build_history_tab(nb)
+        self._build_education_tab(nb)
 
         tk.Button(self, text="Save All & Close", font=("Helvetica", 10, "bold"),
                   bg="#1a3c5e", fg="white", padx=12, pady=5,
@@ -203,38 +233,225 @@ class EditProfileWindow(tk.Toplevel):
                          "years_experience": v[2], "professional_use": v[3]})
         return rows
 
-    # ---- Advanced (JSON) tab ----
+    # ---- Generic add/edit dialog ----
+    # field_specs: list of (key, label, kind, height)
+    #   kind: 'entry' (single-line), 'text' (paragraph), 'bullets' (one per line),
+    #         'competencies' (### Category / - bullet blocks)
 
-    def _build_advanced_tab(self, nb):
+    def _open_dialog(self, title, field_specs, initial=None):
+        initial = initial or {}
+        dlg = tk.Toplevel(self)
+        dlg.title(title)
+        dlg.configure(padx=12, pady=12)
+        dlg.grab_set()
+        dlg.resizable(True, True)
+
+        widgets = {}
+        row = 0
+        for key, label, kind, height in field_specs:
+            hint = ""
+            if kind == "bullets":
+                hint = "  (one per line)"
+            elif kind == "competencies":
+                hint = "  (### Category, then - bullet lines; blank line between categories)"
+            tk.Label(dlg, text=label + hint, anchor="w", font=("Helvetica", 9, "bold")).grid(
+                row=row, column=0, sticky="w", pady=(6,1))
+            row += 1
+            if kind == "entry":
+                w = tk.Entry(dlg, width=70)
+                w.insert(0, initial.get(key) or "")
+            else:
+                font = ("Courier", 9) if kind == "competencies" else ("Helvetica", 9)
+                w = tk.Text(dlg, width=70, height=height, wrap="word", font=font)
+                if kind == "bullets":
+                    w.insert("1.0", "\n".join(initial.get(key) or []))
+                elif kind == "competencies":
+                    w.insert("1.0", _competencies_to_text(initial.get(key) or []))
+                else:
+                    w.insert("1.0", initial.get(key) or "")
+            w.grid(row=row, column=0, sticky="ew")
+            widgets[key] = (w, kind)
+            row += 1
+
+        result = {}
+        state = {"ok": False}
+        def ok():
+            for key, (w, kind) in widgets.items():
+                if kind == "entry":
+                    val = w.get().strip()
+                    result[key] = (val or None) if key == "note" else val
+                elif kind == "bullets":
+                    result[key] = [l.strip() for l in w.get("1.0", "end").splitlines() if l.strip()]
+                elif kind == "competencies":
+                    result[key] = _text_to_competencies(w.get("1.0", "end"))
+                else:
+                    result[key] = w.get("1.0", "end").strip()
+            state["ok"] = True
+            dlg.destroy()
+        def cancel():
+            dlg.destroy()
+
+        bf = tk.Frame(dlg)
+        bf.grid(row=row, column=0, pady=(10,0))
+        tk.Button(bf, text="OK",     command=ok).pack(side="left", padx=4)
+        tk.Button(bf, text="Cancel", command=cancel).pack(side="left", padx=4)
+        dlg.columnconfigure(0, weight=1)
+        self.wait_window(dlg)
+        return result if state["ok"] else None
+
+    def _build_list_tab(self, nb, tab_name, columns, field_specs, row_to_values, items_attr, tree_attr):
         frame = ttk.Frame(nb)
-        nb.add(frame, text="Experience / Education / Projects")
+        nb.add(frame, text=tab_name)
         frame.configure(padding=12)
-        tk.Label(frame, text="Edit experience, education, and projects as JSON.",
-                 anchor="w").pack(anchor="w")
-        self.json_editor = tk.Text(frame, width=80, height=30, wrap="none", font=("Courier", 9))
-        self.json_editor.pack(fill="both", expand=True, pady=(6,0))
-        sb = ttk.Scrollbar(frame, command=self.json_editor.yview)
-        self.json_editor["yscrollcommand"] = sb.set
-        data = {
-            "experience": self.cfg.get("experience", []),
-            "education":  self.cfg.get("education",  []),
-            "projects":   self.cfg.get("projects",   []),
-        }
-        self.json_editor.insert("1.0", json.dumps(data, indent=2))
 
-    def _advanced_data(self):
-        raw = self.json_editor.get("1.0", "end").strip()
-        return json.loads(raw)
+        tree = ttk.Treeview(frame, columns=[c[0] for c in columns], show="headings", height=10)
+        for key, label, width in columns:
+            tree.heading(key, text=label)
+            tree.column(key, width=width, anchor="w")
+        tree.pack(fill="both", expand=True, side="top")
+        setattr(self, tree_attr, tree)
+        setattr(self, items_attr, {})
+
+        def add():
+            data = self._open_dialog("Add " + tab_name.rstrip("s"), field_specs)
+            if data:
+                iid = tree.insert("", "end", values=row_to_values(data))
+                getattr(self, items_attr)[iid] = data
+
+        def edit(event=None):
+            sel = tree.selection()
+            if not sel:
+                return
+            iid = sel[0]
+            data = self._open_dialog("Edit " + tab_name.rstrip("s"), field_specs, initial=getattr(self, items_attr)[iid])
+            if data:
+                getattr(self, items_attr)[iid] = data
+                tree.item(iid, values=row_to_values(data))
+
+        def delete():
+            for iid in tree.selection():
+                tree.delete(iid)
+                del getattr(self, items_attr)[iid]
+
+        tree.bind("<Double-1>", edit)
+
+        btn_frame = tk.Frame(frame)
+        btn_frame.pack(fill="x", pady=(6,0))
+        tk.Button(btn_frame, text="Add",    command=add).pack(side="left", padx=2)
+        tk.Button(btn_frame, text="Edit",   command=edit).pack(side="left", padx=2)
+        tk.Button(btn_frame, text="Delete", command=delete).pack(side="left", padx=2)
+
+        return tree
+
+    def _rows_for(self, items_attr, tree_attr):
+        tree = getattr(self, tree_attr)
+        items = getattr(self, items_attr)
+        return [items[iid] for iid in tree.get_children()]
+
+    # ---- Experience & Projects tab (combined "history" list) ----
+
+    JOB_FIELDS = [
+        ("title",        "Title",    "entry", 1),
+        ("employer",     "Employer", "entry", 1),
+        ("location",     "Location", "entry", 1),
+        ("dates",        "Dates",    "entry", 1),
+        ("note",         "Note (optional)", "entry", 1),
+        ("bullets",      "Bullets",  "bullets", 5),
+        ("competencies", "Competencies (functional resume only, optional)", "competencies", 8),
+    ]
+
+    PROJECT_FIELDS = [
+        ("name",         "Name", "entry", 1),
+        ("url",          "URL",  "entry", 1),
+        ("description",  "Description", "text", 4),
+        ("competencies", "Competencies (functional resume only, optional)", "competencies", 8),
+    ]
+
+    @staticmethod
+    def _history_row_values(d):
+        if d.get("kind") == "job":
+            return ("Job", d.get("title",""), d.get("employer",""), d.get("dates",""))
+        return ("Project", d.get("name",""), d.get("url",""), "")
+
+    def _build_history_tab(self, nb):
+        frame = ttk.Frame(nb)
+        nb.add(frame, text="Experience & Projects")
+        frame.configure(padding=12)
+
+        columns = [("kind","Kind",70), ("label","Title / Name",180), ("detail","Employer / URL",200), ("dates","Dates",140)]
+        tree = ttk.Treeview(frame, columns=[c[0] for c in columns], show="headings", height=14)
+        for key, label, width in columns:
+            tree.heading(key, text=label)
+            tree.column(key, width=width, anchor="w")
+        tree.pack(fill="both", expand=True, side="top")
+        self.history_tree = tree
+        self._history_items = {}
+
+        def add(kind):
+            fields = self.JOB_FIELDS if kind == "job" else self.PROJECT_FIELDS
+            data = self._open_dialog("Add " + ("Job" if kind == "job" else "Project"), fields)
+            if data:
+                data["kind"] = kind
+                iid = tree.insert("", "end", values=self._history_row_values(data))
+                self._history_items[iid] = data
+
+        def edit(event=None):
+            sel = tree.selection()
+            if not sel:
+                return
+            iid = sel[0]
+            current = self._history_items[iid]
+            kind = current.get("kind", "job")
+            fields = self.JOB_FIELDS if kind == "job" else self.PROJECT_FIELDS
+            data = self._open_dialog("Edit " + ("Job" if kind == "job" else "Project"), fields, initial=current)
+            if data:
+                data["kind"] = kind
+                self._history_items[iid] = data
+                tree.item(iid, values=self._history_row_values(data))
+
+        def delete():
+            for iid in tree.selection():
+                tree.delete(iid)
+                del self._history_items[iid]
+
+        tree.bind("<Double-1>", edit)
+
+        btn_frame = tk.Frame(frame)
+        btn_frame.pack(fill="x", pady=(6,0))
+        tk.Button(btn_frame, text="Add Job",     command=lambda: add("job")).pack(side="left", padx=2)
+        tk.Button(btn_frame, text="Add Project", command=lambda: add("project")).pack(side="left", padx=2)
+        tk.Button(btn_frame, text="Edit",        command=edit).pack(side="left", padx=2)
+        tk.Button(btn_frame, text="Delete",      command=delete).pack(side="left", padx=2)
+
+        for item in self.cfg.get("history", []):
+            iid = tree.insert("", "end", values=self._history_row_values(item))
+            self._history_items[iid] = item
+
+    # ---- Education tab ----
+
+    EDUCATION_FIELDS = [
+        ("program", "Program", "entry", 1),
+        ("school",  "School",  "entry", 1),
+        ("dates",   "Dates",   "entry", 1),
+        ("note",    "Note (optional)", "entry", 1),
+    ]
+
+    def _build_education_tab(self, nb):
+        tree = self._build_list_tab(
+            nb, "Education",
+            columns=[("program","Program",200), ("school","School",180), ("dates","Dates",120)],
+            field_specs=self.EDUCATION_FIELDS,
+            row_to_values=lambda d: (d.get("program",""), d.get("school",""), d.get("dates","")),
+            items_attr="_edu_items", tree_attr="edu_tree")
+        for edu in self.cfg.get("education", []):
+            iid = tree.insert("", "end", values=(edu.get("program",""), edu.get("school",""), edu.get("dates","")))
+            self._edu_items[iid] = edu
 
     # ---- Save all ----
 
     def _save_all(self):
         try:
             contact, defaults = self._contact_defaults_data()
-            adv = self._advanced_data()
-        except json.JSONDecodeError as e:
-            messagebox.showerror("JSON Error", "Invalid JSON in Experience/Education/Projects:\n{}".format(e), parent=self)
-            return
         except Exception as e:
             messagebox.showerror("Error", str(e), parent=self)
             return
@@ -242,9 +459,8 @@ class EditProfileWindow(tk.Toplevel):
         new_cfg = {
             "contact":    contact,
             "defaults":   defaults,
-            "experience": adv["experience"],
-            "education":  adv["education"],
-            "projects":   adv.get("projects", []),
+            "history":    self._rows_for("_history_items", "history_tree"),
+            "education":  self._rows_for("_edu_items", "edu_tree"),
         }
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(new_cfg, f, indent=2)

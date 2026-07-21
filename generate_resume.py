@@ -183,9 +183,12 @@ def build_resume(job_config, config_path, skills_path):
         for cat, items in _default_skills(skills_path, defaults["category_order"]).items():
             story.append(Paragraph("<b>{}:</b> {}".format(cat, ", ".join(items)), styles["SkillLine"]))
 
+    jobs     = [h for h in cfg.get("history", []) if h.get("kind") == "job"]
+    projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"]
+
     # Experience
     story.append(Paragraph("EXPERIENCE", styles["SectionHeader"]))
-    for job in cfg["experience"]:
+    for job in jobs:
         header_row = Table(
             [[Paragraph("{} — {}".format(job["title"], job["employer"]), styles["JobTitle"]),
               Paragraph(job["dates"], styles["JobTitle"])]],
@@ -208,9 +211,9 @@ def build_resume(job_config, config_path, skills_path):
         story.append(Spacer(1, 4))
 
     # Projects
-    if cfg.get("projects"):
+    if projects:
         story.append(Paragraph("PROJECTS", styles["SectionHeader"]))
-        for p in cfg["projects"]:
+        for p in projects:
             story.append(Paragraph('{} <font color="#555555">({})</font>'.format(p["name"], p["url"]), styles["ProjName"]))
             story.append(Paragraph(p["description"], styles["ProjDesc"]))
 

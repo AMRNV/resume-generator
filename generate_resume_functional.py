@@ -8,17 +8,17 @@ into narrative bullets by theme, a bullet-less PROFESSIONAL EXPERIENCE list
 (title/employer/location/dates only), plus TECHNICAL PROJECTS and EDUCATION
 AND CERTIFICATIONS sections.
 
-Uses the same profiles/<Name>/config.json as generate_resume.py, plus:
+Uses the same profiles/<Name>/config.json as generate_resume.py, where
+history[] holds both jobs and projects tagged by "kind", plus:
 
-    experience[].competencies (list, optional)  per-job competency bullets
-    projects[].competencies (list, optional)    per-project competency bullets
-        both shaped as [{"category": str, "bullets": [str, ...]}, ...]
+    history[].competencies (list, optional)     per-job/per-project competency bullets
+        shaped as [{"category": str, "bullets": [str, ...]}, ...]
     defaults.functional_summary (str, optional) falls back to defaults.summary
 
 The CORE SKILLS & COMPETENCIES section is assembled automatically by pulling
-the "competencies" entries off every job in experience and every entry in
-projects, grouping their bullets by category (in first-seen order), and
-tagging each bullet with the job/project it came from.
+the "competencies" entries off every entry in history, grouping their bullets
+by category (in first-seen order), and tagging each bullet with the job/project
+it came from.
 
 build_resume_functional(job_config, config_path) -> str (path to generated PDF)
 """
@@ -69,8 +69,8 @@ def _styles():
 
 
 def _aggregate_competencies(cfg):
-    """Pull competencies off every job in experience and every project, grouped
-    by category (first-seen order), each bullet tagged with its source."""
+    """Pull competencies off every entry in history, grouped by category
+    (first-seen order), each bullet tagged with its source."""
     order = []
     grouped = {}
 
@@ -83,10 +83,11 @@ def _aggregate_competencies(cfg):
             for bullet in group.get("bullets", []):
                 grouped[cat].append((bullet, kind, label))
 
-    for job in cfg.get("experience", []):
-        add_source("Job", "{} — {}".format(job["title"], job["employer"]), job.get("competencies"))
-    for p in cfg.get("projects", []):
-        add_source("Project", p["name"], p.get("competencies"))
+    for h in cfg.get("history", []):
+        if h.get("kind") == "job":
+            add_source("Job", "{} — {}".format(h["title"], h["employer"]), h.get("competencies"))
+        elif h.get("kind") == "project":
+            add_source("Project", h["name"], h.get("competencies"))
 
     return [{"category": cat, "items": grouped[cat]} for cat in order]
 
@@ -148,9 +149,12 @@ def build_resume_functional(job_config, config_path):
             else:
                 story.append(Paragraph("&bull; {}".format(item), styles["Bullet"]))
 
+    jobs     = [h for h in cfg.get("history", []) if h.get("kind") == "job"]
+    projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"]
+
     # Professional Experience — headers only, no accomplishment bullets
     story.append(Paragraph("PROFESSIONAL EXPERIENCE", styles["SectionHeader"]))
-    for job in cfg["experience"]:
+    for job in jobs:
         header_row = Table(
             [[Paragraph("{} — {}".format(job["title"], job["employer"]), styles["JobTitle"]),
               Paragraph(job["dates"], styles["JobTitle"])]],
@@ -167,9 +171,9 @@ def build_resume_functional(job_config, config_path):
         story.append(Paragraph(job["location"], styles["JobMeta"]))
 
     # Technical Projects
-    if cfg.get("projects"):
+    if projects:
         story.append(Paragraph("TECHNICAL PROJECTS", styles["SectionHeader"]))
-        for p in cfg["projects"]:
+        for p in projects:
             story.append(Paragraph('{} <font color="#555555">({})</font>'.format(p["name"], p["url"]), styles["ProjName"]))
             story.append(Paragraph(p["description"], styles["ProjDesc"]))
 

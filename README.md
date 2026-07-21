@@ -48,10 +48,12 @@ python resume_app.py
     "job_title": "Software Developer",
     "headline": "Full-stack developer | 5 years experience",
     "summary": "Your default summary paragraph here.",
+    "functional_summary": "Optional alternate summary used by the functional-style resume; falls back to summary if omitted.",
     "category_order": ["Languages", "Web", "Databases", "DevOps & Cloud", "AI & ML", "Other"]
   },
-  "experience": [
+  "history": [
     {
+      "kind": "job",
       "employer": "Acme Corp",
       "note": null,
       "location": "Toronto, ON",
@@ -60,6 +62,28 @@ python resume_app.py
       "bullets": [
         "Built and maintained X, resulting in Y",
         "Led migration from A to B"
+      ],
+      "competencies": [
+        {
+          "category": "Enterprise Software Development",
+          "bullets": [
+            "Narrative-style accomplishment bullet used by the functional resume's Skills section."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "project",
+      "name": "My Project",
+      "url": "github.com/janesmith/myproject",
+      "description": "One or two sentence description of the project and what it does.",
+      "competencies": [
+        {
+          "category": "AI & Emerging Technology Solutions",
+          "bullets": [
+            "Narrative-style accomplishment bullet sourced from a project instead of a job."
+          ]
+        }
       ]
     }
   ],
@@ -70,16 +94,11 @@ python resume_app.py
       "dates": "2016 - 2020",
       "note": "Focus: Algorithms, Distributed Systems"
     }
-  ],
-  "projects": [
-    {
-      "name": "My Project",
-      "url": "github.com/janesmith/myproject",
-      "description": "One or two sentence description of the project and what it does."
-    }
   ]
 }
 ```
+
+`history` holds both jobs and projects, distinguished by `"kind"` (`"job"` or `"project"`) — order in the list is the order they render in. `competencies` on a `history` entry is optional and only used by the functional-style resume (see below); it's ignored by the default chronological resume.
 
 ### `skills.csv`
 
@@ -103,22 +122,28 @@ Docker,DevOps & Cloud,2,No
 
 **Matched resume** (job description pasted in): scores every skill against the posting text and picks the top 18. Whole-word matches score highest; professional use and years of experience break ties.
 
+## Functional-Style Resume
+
+Click **Generate Functional Resume** in the app for an alternate layout: a colored header banner (name/location/phone/email only — no headline or links), a **CORE SKILLS & COMPETENCIES** section grouped into narrative bullets by theme, and a bullet-less **PROFESSIONAL EXPERIENCE** list (title/employer/location/dates only).
+
+The Skills section is assembled automatically — no separate list to maintain. It pulls the optional `competencies` entries off every entry in `history`, groups their bullets by category (in first-seen order), and tags each bullet with the job or project it came from, e.g. `(Job: Software Developer — Acme Corp)` or `(Project: My Project)`. Entries without a `competencies` field are simply skipped.
+
+This is produced by `generate_resume_functional.py`, a separate engine from `generate_resume.py` — use `build_resume_functional(job_config, config_path)` if calling it directly.
+
 ## File Structure
 
 ```
-resume_app.py          — GUI app (run this)
-generate_resume.py     — PDF engine (used by the app and importable)
+resume_app.py                 — GUI app (run this)
+generate_resume.py            — chronological PDF engine (used by the app and importable)
+generate_resume_functional.py — functional/competency-style PDF engine
 generate_cover_letter.py
-career_data.py         — backward-compat shim (legacy)
 profiles/
 └── <Name>/
-    ├── config.json    — contact info, defaults, experience, education, projects
+    ├── config.json    — contact info, defaults, history (jobs + projects), education
     ├── skills.csv     — skill inventory
     └── outputs/       — generated PDFs land here
 ```
 
 ## Editing a Profile in the App
 
-Click **Edit Profile** in the main window to open the profile editor. Changes to contact info, defaults, and skills save back to the profile files immediately on "Save All & Close".
-
-For experience, education, and projects, use the **Experience / Education / Projects** tab — it exposes the raw JSON for those sections.
+Click **Edit Profile** in the main window to open the profile editor. It has a tab per section — **Contact & Defaults**, **Skills**, **Experience & Projects**, **Education** — each with Add/Edit/Delete controls instead of raw JSON. Entries in **Experience & Projects** are added via separate "Add Job" / "Add Project" buttons and rendered in whatever order they're listed in. Bullets are entered one per line; competencies (used only by the functional-style resume) use a light `### Category` / `- bullet` format. Everything saves back to the profile files on "Save All & Close".
