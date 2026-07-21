@@ -15,6 +15,7 @@ from generate_resume import (
     build_resume, list_profiles, profile_paths,
     _default_skills, _matched_skills, _load_config,
 )
+from generate_resume_functional import build_resume_functional
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -317,11 +318,17 @@ class ResumeApp(tk.Tk):
                  justify="left", fg="#555555", anchor="w").grid(
             row=11, column=0, columnspan=2, sticky="w", pady=(0,12))
 
-        # --- Generate button ---
-        self.gen_btn = tk.Button(self, text="Generate Resume", font=("Helvetica", 11, "bold"),
+        # --- Generate buttons ---
+        gen_row = tk.Frame(self)
+        gen_row.grid(row=12, column=0, columnspan=2, pady=(0,4))
+        self.gen_btn = tk.Button(gen_row, text="Generate Resume", font=("Helvetica", 11, "bold"),
                                   bg="#1a3c5e", fg="white", padx=16, pady=6,
                                   command=self._generate)
-        self.gen_btn.grid(row=12, column=0, columnspan=2, pady=(0,4))
+        self.gen_btn.pack(side="left", padx=(0,6))
+        self.gen_functional_btn = tk.Button(gen_row, text="Generate Functional Resume", font=("Helvetica", 11, "bold"),
+                                  bg="#153d63", fg="white", padx=16, pady=6,
+                                  command=self._generate_functional)
+        self.gen_functional_btn.pack(side="left")
 
         # --- Status ---
         self.status_var = tk.StringVar(value="")
@@ -424,6 +431,39 @@ class ResumeApp(tk.Tk):
             self.status_var.set("")
         finally:
             self.gen_btn.config(state="normal")
+
+    def _generate_functional(self):
+        name = self.profile_var.get()
+        if not name:
+            messagebox.showwarning("No Profile", "Please select a profile first.")
+            return
+        config_path, _, default_output = profile_paths(name)
+
+        job_config = {
+            "job_title":  self.job_title.get().strip() or _load_config(config_path)["defaults"]["job_title"],
+            "output_dir": default_output,
+        }
+        summary_text = self.summary.get("1.0", "end").strip()
+        if summary_text:
+            job_config["summary"] = summary_text
+
+        self.gen_functional_btn.config(state="disabled")
+        self.status_var.set("Generating...")
+        self.update()
+        try:
+            path = build_resume_functional(job_config, config_path)
+            self.status_var.set("Saved: {}".format(os.path.basename(path)))
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":
+                subprocess.call(["open", path])
+            else:
+                subprocess.call(["xdg-open", path])
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.status_var.set("")
+        finally:
+            self.gen_functional_btn.config(state="normal")
 
 
 if __name__ == "__main__":
