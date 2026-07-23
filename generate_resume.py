@@ -18,7 +18,6 @@ job_config keys:
 import os
 import csv
 import re
-import json
 from collections import defaultdict
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -28,6 +27,8 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable,
 )
+
+from config_loader import _load_config
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _PROFILES_DIR = os.path.join(_DIR, "profiles")
@@ -52,11 +53,6 @@ def profile_paths(name):
         os.path.join(folder, "skills.csv"),
         os.path.join(folder, "outputs"),
     )
-
-
-def _load_config(config_path):
-    with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
 
 
 def _load_skills_csv(skills_path):

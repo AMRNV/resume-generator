@@ -33,7 +33,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 
-from generate_resume import _load_config
+from config_loader import _load_config
 
 ACCENT   = colors.HexColor("#153d63")
 DARKGRAY = colors.HexColor("#333333")
@@ -81,7 +81,7 @@ def _aggregate_competencies(cfg):
                 grouped[cat] = []
                 order.append(cat)
             for bullet in group.get("bullets", []):
-                grouped[cat].append((bullet, kind, label))
+                grouped[cat].append(bullet)
 
     for h in cfg.get("history", []):
         if h.get("kind") == "job":
@@ -141,13 +141,7 @@ def build_resume_functional(job_config, config_path):
     for group in competencies:
         story.append(Paragraph(group["category"], styles["CompCategory"]))
         for item in group.get("items", group.get("bullets", [])):
-            if isinstance(item, (tuple, list)) and len(item) == 3:
-                bullet, kind, label = item
-                story.append(Paragraph(
-                    '&bull; {} <font size="7" color="#888888">({}: {})</font>'.format(bullet, kind, label),
-                    styles["Bullet"]))
-            else:
-                story.append(Paragraph("&bull; {}".format(item), styles["Bullet"]))
+            story.append(Paragraph("&bull; {}".format(item), styles["Bullet"]))
 
     jobs     = [h for h in cfg.get("history", []) if h.get("kind") == "job"]
     projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"]

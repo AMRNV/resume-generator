@@ -13,9 +13,10 @@ from tkinter import ttk, messagebox
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from generate_resume import (
     build_resume, list_profiles, profile_paths,
-    _default_skills, _matched_skills, _load_config,
+    _default_skills, _matched_skills,
 )
 from generate_resume_functional import build_resume_functional
+from config_loader import _load_config
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -118,7 +119,9 @@ class EditProfileWindow(tk.Toplevel):
         self.f_job_title = row(frame, "Default Job Title", 10, d.get("job_title",""))
         self.f_headline  = row(frame, "Default Headline",  11, d.get("headline",""))
         self.f_summary   = row(frame, "Default Summary",   12, d.get("summary",""), height=4)
-        self.f_cat_order = row(frame, "Category Order (comma-separated)", 13,
+        self.f_func_summary = row(frame, "Functional Summary (used by Functional Resume; optional)", 13,
+                                  d.get("functional_summary",""), height=4)
+        self.f_cat_order = row(frame, "Category Order (comma-separated)", 14,
                                ", ".join(d.get("category_order",[])))
         frame.columnconfigure(0, weight=1)
 
@@ -137,12 +140,20 @@ class EditProfileWindow(tk.Toplevel):
             "github_url":   entry_val(self.f_git_url),
             "location":     entry_val(self.f_location),
         }
-        defaults = {
+        # start from the existing defaults so fields this form doesn't expose
+        # (or hasn't been taught about yet) survive a save instead of being wiped
+        defaults = dict(self.cfg.get("defaults", {}))
+        defaults.update({
             "job_title":      entry_val(self.f_job_title),
             "headline":       entry_val(self.f_headline),
             "summary":        entry_val(self.f_summary),
             "category_order": cat_list,
-        }
+        })
+        func_summary = entry_val(self.f_func_summary)
+        if func_summary:
+            defaults["functional_summary"] = func_summary
+        else:
+            defaults.pop("functional_summary", None)
         return contact, defaults
 
     # ---- Skills tab ----
