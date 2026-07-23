@@ -141,10 +141,11 @@ def build_resume(job_config, config_path, skills_path):
     job_title     = job_config.get("job_title", defaults["job_title"])
     headline      = job_config.get("headline",  defaults["headline"])
     summary       = job_config.get("summary",   defaults["summary"])
-    skills_order  = job_config.get("skills_order")
-    job_desc      = job_config.get("job_description")
-    exp_overrides = job_config.get("experience_bullets", {})
-    output_dir    = job_config.get("output_dir", default_output)
+    skills_order          = job_config.get("skills_order")
+    job_desc              = job_config.get("job_description")
+    exp_overrides         = job_config.get("experience_bullets", {})
+    include_hidden        = job_config.get("include_hidden_projects", False)
+    output_dir            = job_config.get("output_dir", default_output)
 
     os.makedirs(output_dir, exist_ok=True)
     name     = contact.get("name", "Resume").replace(" ", "_")
@@ -180,7 +181,8 @@ def build_resume(job_config, config_path, skills_path):
             story.append(Paragraph("<b>{}:</b> {}".format(cat, ", ".join(items)), styles["SkillLine"]))
 
     jobs     = [h for h in cfg.get("history", []) if h.get("kind") == "job"]
-    projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"]
+    projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"
+                and (not h.get("hidden") or include_hidden)]
 
     # Experience
     story.append(Paragraph("EXPERIENCE", styles["SectionHeader"]))

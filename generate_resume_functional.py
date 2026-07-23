@@ -68,7 +68,7 @@ def _styles():
     }
 
 
-def _aggregate_competencies(cfg):
+def _aggregate_competencies(cfg, include_hidden=False):
     """Pull competencies off every entry in history, grouped by category
     (first-seen order), each bullet tagged with its source."""
     order = []
@@ -86,7 +86,7 @@ def _aggregate_competencies(cfg):
     for h in cfg.get("history", []):
         if h.get("kind") == "job":
             add_source("Job", "{} — {}".format(h["title"], h["employer"]), h.get("competencies"))
-        elif h.get("kind") == "project":
+        elif h.get("kind") == "project" and (not h.get("hidden") or include_hidden):
             add_source("Project", h["name"], h.get("competencies"))
 
     return [{"category": cat, "items": grouped[cat]} for cat in order]
@@ -98,10 +98,11 @@ def build_resume_functional(job_config, config_path):
     defaults = cfg["defaults"]
     default_output = os.path.join(os.path.dirname(config_path), "outputs")
 
-    job_title    = job_config.get("job_title", defaults["job_title"])
-    summary      = job_config.get("summary", defaults.get("functional_summary", defaults["summary"]))
-    competencies = job_config.get("competencies") or _aggregate_competencies(cfg)
-    output_dir   = job_config.get("output_dir", default_output)
+    job_title      = job_config.get("job_title", defaults["job_title"])
+    summary        = job_config.get("summary", defaults.get("functional_summary", defaults["summary"]))
+    include_hidden = job_config.get("include_hidden_projects", False)
+    competencies   = job_config.get("competencies") or _aggregate_competencies(cfg, include_hidden)
+    output_dir     = job_config.get("output_dir", default_output)
 
     os.makedirs(output_dir, exist_ok=True)
     name     = contact.get("name", "Resume").replace(" ", "_")
@@ -144,7 +145,8 @@ def build_resume_functional(job_config, config_path):
             story.append(Paragraph("&bull; {}".format(item), styles["Bullet"]))
 
     jobs     = [h for h in cfg.get("history", []) if h.get("kind") == "job"]
-    projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"]
+    projects = [h for h in cfg.get("history", []) if h.get("kind") == "project"
+                and (not h.get("hidden") or include_hidden)]
 
     # Professional Experience — headers only, no accomplishment bullets
     story.append(Paragraph("PROFESSIONAL EXPERIENCE", styles["SectionHeader"]))
