@@ -105,8 +105,11 @@ def build_resume_functional(job_config, config_path):
     output_dir     = job_config.get("output_dir", default_output)
 
     os.makedirs(output_dir, exist_ok=True)
-    name     = contact.get("name", "Resume").replace(" ", "_")
-    filepath = os.path.join(output_dir, "{}_{}_functional_resume.pdf".format(name, job_title))
+    name = contact.get("name", "Resume").replace(" ", "_")
+    if "job_title" in job_config:
+        filepath = os.path.join(output_dir, "{}_{}_functional_resume.pdf".format(name, job_title.replace(" ", "_")))
+    else:
+        filepath = os.path.join(output_dir, "{}_functional_resume.pdf".format(name))
 
     styles = _styles()
     doc = SimpleDocTemplate(filepath, pagesize=letter,
