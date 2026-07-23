@@ -2,10 +2,12 @@
 
 A standalone Python app for generating tailored PDF resumes. Drop in your profile once, then generate job-specific resumes in seconds — with automatic skill matching from the job posting.
 
+Works three ways: as a GUI desktop app, called directly from Python, or driven by an AI agent.
+
 ## Requirements
 
 - Python 3.8+
-- `reportlab` — the only third-party dependency
+- [`reportlab`](https://pypi.org/project/reportlab/) — PDF generation library, the only third-party dependency
 
 ```bash
 pip install reportlab
@@ -126,7 +128,7 @@ Docker,DevOps & Cloud,2,No
 
 Click **Generate Functional Resume** in the app for an alternate layout: a colored header banner (name/location/phone/email only — no headline or links), a **CORE SKILLS & COMPETENCIES** section grouped into narrative bullets by theme, and a bullet-less **PROFESSIONAL EXPERIENCE** list (title/employer/location/dates only).
 
-The Skills section is assembled automatically — no separate list to maintain. It pulls the optional `competencies` entries off every entry in `history`, groups their bullets by category (in first-seen order), and tags each bullet with the job or project it came from, e.g. `(Job: Software Developer — Acme Corp)` or `(Project: My Project)`. Entries without a `competencies` field are simply skipped.
+The Skills section is assembled automatically — no separate list to maintain. It pulls the optional `competencies` entries off every entry in `history` and groups their bullets by category in first-seen order. Entries without a `competencies` field are simply skipped.
 
 This is produced by `generate_resume_functional.py`, a separate engine from `generate_resume.py` — use `build_resume_functional(job_config, config_path)` if calling it directly.
 
@@ -136,13 +138,63 @@ This is produced by `generate_resume_functional.py`, a separate engine from `gen
 resume_app.py                 — GUI app (run this)
 generate_resume.py            — chronological PDF engine (used by the app and importable)
 generate_resume_functional.py — functional/competency-style PDF engine
-generate_cover_letter.py
 profiles/
 └── <Name>/
     ├── config.json    — contact info, defaults, history (jobs + projects), education
     ├── skills.csv     — skill inventory
     └── outputs/       — generated PDFs land here
 ```
+
+## Programmatic Usage
+
+All three generators are importable and can be called directly from Python without launching the GUI.
+
+```python
+import sys
+sys.path.insert(0, "/path/to/resume-generator")
+
+from generate_resume import build_resume, profile_paths
+from generate_resume_functional import build_resume_functional
+
+config_path, skills_path, _ = profile_paths("Jane Smith")
+
+# Chronological resume — default skills
+resume_path = build_resume({}, config_path, skills_path)
+
+# Chronological resume — skills matched to a job posting
+resume_path = build_resume({
+    "job_title":       "Senior Software Developer",
+    "headline":        "Backend developer | Python | SQL | 5 years experience",
+    "summary":         "Tailored summary for this role.",
+    "job_description": "<paste full job posting text here>",
+}, config_path, skills_path)
+
+# Functional/competency-style resume
+func_path = build_resume_functional({"job_title": "Software Developer"}, config_path)
+
+```
+
+All functions return the path to the generated PDF.
+
+## Using with AI Agents
+
+This tool is designed to work with AI agents (Claude, GPT, etc.) that can read a job posting and generate tailored application materials automatically.
+
+**How it works:**
+
+1. The agent reads the candidate's `config.json` and `skills.csv` to understand their background, experience, and skill set.
+2. The agent reads the job posting (pasted by the user or fetched from a URL).
+3. The agent writes a `job_config` dict — a small, job-specific overlay containing the tailored title, headline, summary, and cover letter paragraphs. It does not rewrite the underlying profile data.
+4. The agent calls `build_resume` and `build_cover_letter` via a Python script or shell command, passing the `job_config` and the profile paths.
+5. The PDFs are written to `profiles/<Name>/outputs/` and returned to the user.
+
+**What the agent needs in context:**
+- `config.json` — career facts (contact info, experience, projects, education)
+- `skills.csv` — skill inventory with years of experience and professional-use flags
+- `generate_resume.py` and `generate_cover_letter.py` — to know the function signatures
+- `project_instructions.md` (optional) — workflow instructions specific to the user's setup
+
+**Key constraint:** the agent should only populate `job_config` fields — it must not modify `config.json` or `skills.csv` directly unless the user explicitly asks to update a career fact. Those files are the source of truth and should only change when something in the person's actual career changes.
 
 ## Editing a Profile in the App
 
