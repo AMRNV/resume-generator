@@ -149,16 +149,13 @@ def build_resume(job_config, config_path, skills_path):
 
     os.makedirs(output_dir, exist_ok=True)
     name = contact.get("name", "Resume").replace(" ", "_")
-    if "job_title" in job_config:
-        filepath = os.path.join(output_dir, "{}_{}_resume.pdf".format(name, job_title.replace(" ", "_")))
-    else:
-        filepath = os.path.join(output_dir, "{}_resume.pdf".format(name))
+    filepath = os.path.join(output_dir, "{}_resume.pdf".format(name))
 
     styles = _styles()
     doc = SimpleDocTemplate(filepath, pagesize=letter,
         leftMargin=0.6*inch, rightMargin=0.6*inch,
         topMargin=0.4*inch,  bottomMargin=0.4*inch,
-        title="{} - {} Resume".format(contact.get("name",""), job_title))
+        title="{} - {} Resume".format(contact.get("name",""), job_title) if "job_title" in job_config else "{} Resume".format(contact.get("name","")))
 
     story = []
 
